@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
     internal abstract class GifBlock
     {
-        internal static GifBlock ReadBlock(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
+        internal static async Task<GifBlock> ReadBlockAsync(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
         {
             int blockId = stream.ReadByte();
             if (blockId < 0)
@@ -13,11 +14,11 @@ namespace WpfAnimatedGif.Decoding
             switch (blockId)
             {
                 case GifExtension.ExtensionIntroducer:
-                    return GifExtension.ReadExtension(stream, controlExtensions, metadataOnly);
+                    return await GifExtension.ReadExtensionAsync(stream, controlExtensions, metadataOnly);
                 case GifFrame.ImageSeparator:
-                    return GifFrame.ReadFrame(stream, controlExtensions, metadataOnly);
+                    return await GifFrame.ReadFrameAsync(stream, controlExtensions, metadataOnly);
                 case GifTrailer.TrailerByte:
-                    return GifTrailer.ReadTrailer();
+                    return await GifTrailer.ReadTrailerAsync();
                 default:
                     throw GifHelpers.UnknownBlockTypeException(blockId);
             }

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -18,18 +19,18 @@ namespace WpfAnimatedGif.Decoding
             get { return GifBlockKind.SpecialPurpose; }
         }
 
-        internal static GifCommentExtension ReadComment(Stream stream)
+        internal static async Task<GifCommentExtension> ReadCommentAsync(Stream stream)
         {
             var comment = new GifCommentExtension();
-            comment.Read(stream);
+            await comment.ReadAsync(stream);
             return comment;
         }
 
-        private void Read(Stream stream)
+        private async Task ReadAsync(Stream stream)
         {
             // Note: at this point, the label (0xFE) has already been read
 
-            var bytes = GifHelpers.ReadDataBlocks(stream, false);
+            var bytes = await GifHelpers.ReadDataBlocksAsync(stream, false);
             if (bytes != null)
                 Text = Encoding.ASCII.GetString(bytes);
         }

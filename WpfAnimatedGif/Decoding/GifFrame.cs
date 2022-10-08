@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -22,25 +23,25 @@ namespace WpfAnimatedGif.Decoding
             get { return GifBlockKind.GraphicRendering; }
         }
 
-        internal static GifFrame ReadFrame(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
+        internal static async Task<GifFrame> ReadFrameAsync(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
         {
             var frame = new GifFrame();
 
-            frame.Read(stream, controlExtensions, metadataOnly);
+            await frame.ReadAsync(stream, controlExtensions, metadataOnly);
 
             return frame;
         }
 
-        private void Read(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
+        private async Task ReadAsync(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
         {
             // Note: at this point, the Image Separator (0x2C) has already been read
 
-            Descriptor = GifImageDescriptor.ReadImageDescriptor(stream);
+            Descriptor = await GifImageDescriptor.ReadImageDescriptorAsync(stream);
             if (Descriptor.HasLocalColorTable)
             {
-                LocalColorTable = GifHelpers.ReadColorTable(stream, Descriptor.LocalColorTableSize);
+                LocalColorTable = await GifHelpers.ReadColorTableAsync(stream, Descriptor.LocalColorTableSize);
             }
-            ImageData = GifImageData.ReadImageData(stream, metadataOnly);
+            ImageData = await GifImageData.ReadImageDataAsync(stream, metadataOnly);
             Extensions = controlExtensions.ToList().AsReadOnly();
         }
     }

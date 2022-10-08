@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -11,17 +12,17 @@ namespace WpfAnimatedGif.Decoding
         {
         }
 
-        internal static GifImageData ReadImageData(Stream stream, bool metadataOnly)
+        internal static async Task<GifImageData> ReadImageDataAsync(Stream stream, bool metadataOnly)
         {
             var imgData = new GifImageData();
-            imgData.Read(stream, metadataOnly);
+            await imgData.ReadAsync(stream, metadataOnly);
             return imgData;
         }
 
-        private void Read(Stream stream, bool metadataOnly)
+        private async Task ReadAsync(Stream stream, bool metadataOnly)
         {
             LzwMinimumCodeSize = (byte)stream.ReadByte();
-            CompressedData = GifHelpers.ReadDataBlocks(stream, metadataOnly);
+            CompressedData = await GifHelpers.ReadDataBlocksAsync(stream, metadataOnly);
         }
     }
 }

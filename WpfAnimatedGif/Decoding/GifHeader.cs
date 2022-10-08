@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -17,22 +18,22 @@ namespace WpfAnimatedGif.Decoding
             get { return GifBlockKind.Other; }
         }
 
-        internal static GifHeader ReadHeader(Stream stream)
+        internal static async Task<GifHeader> ReadHeaderAsync(Stream stream)
         {
             var header = new GifHeader();
-            header.Read(stream);
+            await header.ReadAsync(stream);
             return header;
         }
 
-        private void Read(Stream stream)
+        private async Task ReadAsync(Stream stream)
         {
-            Signature = GifHelpers.ReadString(stream, 3);
+            Signature = await GifHelpers.ReadStringAsync(stream, 3);
             if (Signature != "GIF")
                 throw GifHelpers.InvalidSignatureException(Signature);
-            Version = GifHelpers.ReadString(stream, 3);
+            Version = await GifHelpers.ReadStringAsync(stream, 3);
             if (Version != "87a" && Version != "89a")
                 throw GifHelpers.UnsupportedVersionException(Version);
-            LogicalScreenDescriptor = GifLogicalScreenDescriptor.ReadLogicalScreenDescriptor(stream);
+            LogicalScreenDescriptor = await GifLogicalScreenDescriptor.ReadLogicalScreenDescriptorAsync(stream);
         }
     }
 }

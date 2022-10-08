@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -18,17 +19,17 @@ namespace WpfAnimatedGif.Decoding
         {
         }
 
-        internal static GifImageDescriptor ReadImageDescriptor(Stream stream)
+        internal static async Task<GifImageDescriptor> ReadImageDescriptorAsync(Stream stream)
         {
             var descriptor = new GifImageDescriptor();
-            descriptor.Read(stream);
+            await descriptor.ReadAsync(stream);
             return descriptor;
         }
 
-        private void Read(Stream stream)
+        private async Task ReadAsync(Stream stream)
         {
             byte[] bytes = new byte[9];
-            stream.ReadAll(bytes, 0, bytes.Length);
+            await stream.ReadAsync(bytes, 0, bytes.Length);
             Left = BitConverter.ToUInt16(bytes, 0);
             Top = BitConverter.ToUInt16(bytes, 2);
             Width = BitConverter.ToUInt16(bytes, 4);

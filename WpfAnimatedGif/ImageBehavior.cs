@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.IO;
 using System.IO.Packaging;
 using System.Linq;
 using System.Net;
+using System.Security.Policy;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
@@ -12,6 +15,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Resources;
+using System.Windows.Shapes;
 using WpfAnimatedGif.Decoding;
 
 namespace WpfAnimatedGif
@@ -334,7 +338,7 @@ namespace WpfAnimatedGif
 
         #endregion
 
-        private static void AnimatedSourceChanged(DependencyObject o, DependencyPropertyChangedEventArgs e)
+        private static async void AnimatedSourceChanged(DependencyObject o, DependencyPropertyChangedEventArgs e)
         {
             Image imageControl = o as Image;
             if (imageControl == null)
@@ -348,7 +352,7 @@ namespace WpfAnimatedGif
                 {
                     var isAnimLoaded = GetIsAnimationLoaded(imageControl);
                     if (!isAnimLoaded)
-                        InitAnimationOrImage(imageControl);
+                        await InitAnimationOrImageAsync(imageControl);
                 }
                 return;
             }
@@ -371,7 +375,7 @@ namespace WpfAnimatedGif
                 imageControl.IsVisibleChanged += VisibilityChanged;
 
                 if (imageControl.IsLoaded)
-                    InitAnimationOrImage(imageControl);
+                    await InitAnimationOrImageAsync(imageControl);
             }
         }
 
@@ -388,12 +392,12 @@ namespace WpfAnimatedGif
             }
         }
 
-        private static void ImageControlLoaded(object sender, RoutedEventArgs e)
+        private static async void ImageControlLoaded(object sender, RoutedEventArgs e)
         {
             Image imageControl = sender as Image;
             if (imageControl == null)
                 return;
-            InitAnimationOrImage(imageControl);
+            await InitAnimationOrImageAsync(imageControl);
         }
 
         static void ImageControlUnloaded(object sender, RoutedEventArgs e)
@@ -409,7 +413,7 @@ namespace WpfAnimatedGif
                 controller.Dispose();
         }
 
-        private static void AnimationPropertyChanged(DependencyObject o, DependencyPropertyChangedEventArgs e)
+        private static async void AnimationPropertyChanged(DependencyObject o, DependencyPropertyChangedEventArgs e)
         {
             Image imageControl = o as Image;
             if (imageControl == null)
@@ -419,11 +423,11 @@ namespace WpfAnimatedGif
             if (source != null)
             {
                 if (imageControl.IsLoaded)
-                    InitAnimationOrImage(imageControl);
+                    await InitAnimationOrImageAsync(imageControl);
             }
         }
 
-        private static void AnimateInDesignModeChanged(DependencyObject o, DependencyPropertyChangedEventArgs e)
+        private static async void AnimateInDesignModeChanged(DependencyObject o, DependencyPropertyChangedEventArgs e)
         {
             Image imageControl = o as Image;
             if (imageControl == null)
@@ -435,13 +439,13 @@ namespace WpfAnimatedGif
             if (source != null && imageControl.IsLoaded)
             {
                 if (newValue)
-                    InitAnimationOrImage(imageControl);
+                    await InitAnimationOrImageAsync(imageControl);
                 else
                     imageControl.BeginAnimation(Image.SourceProperty, null);
             }
         }
 
-        private static void InitAnimationOrImage(Image imageControl)
+        private static async Task InitAnimationOrImageAsync(Image imageControl)
         {
             var controller = GetAnimationController(imageControl);
             if (controller != null)
@@ -471,17 +475,17 @@ namespace WpfAnimatedGif
                 if (source.IsDownloading)
                 {
                     EventHandler handler = null;
-                    handler = (sender, args) =>
+                    handler = async (sender, args) =>
                     {
                         source.DownloadCompleted -= handler;
-                        InitAnimationOrImage(imageControl);
+                        await InitAnimationOrImageAsync(imageControl);
                     };
                     source.DownloadCompleted += handler;
                     imageControl.Source = source;
                     return;
                 }
 
-                var animation = GetAnimation(imageControl, source);
+                var animation = await GetAnimationAsync(imageControl, source);
                 if (animation != null)
                 {
                     if (animation.KeyFrames.Count > 0)
@@ -509,12 +513,14 @@ namespace WpfAnimatedGif
             }
         }
 
-        private static ObjectAnimationUsingKeyFrames GetAnimation(Image imageControl, BitmapSource source)
+        private static async Task<ObjectAnimationUsingKeyFrames> GetAnimationAsync(Image imageControl, BitmapSource source)
         {
             var cacheEntry = AnimationCache.Get(source);
             if (cacheEntry == null)
             {
-                var decoder = GetDecoder(source, imageControl, out GifFile gifMetadata) as GifBitmapDecoder;
+                var tuple = await GetDecoderAsync(source, imageControl);
+                var decoder = tuple.Item1 as GifBitmapDecoder;
+                var gifMetadata = tuple.Item2;
                 if (decoder != null && decoder.Frames.Count > 1)
                 {
                     var fullSize = GetFullSize(decoder, gifMetadata);
@@ -653,9 +659,9 @@ namespace WpfAnimatedGif
             return false;
         }
 
-        private static BitmapDecoder GetDecoder(BitmapSource image, Image imageControl, out GifFile gifFile)
+        private static async Task<Tuple<BitmapDecoder, GifFile>> GetDecoderAsync(BitmapSource image, Image imageControl)
         {
-            gifFile = null;
+            GifFile gifFile = null;
             BitmapDecoder decoder = null;
             Stream stream = null;
             Uri uri = null;
@@ -708,11 +714,11 @@ namespace WpfAnimatedGif
                 if (stream != null)
                 {
                     stream.Position = 0;
-                    gifFile = GifFile.ReadGifFile(stream, true);
+                    gifFile = await GifFile.ReadGifFileAsync(stream, true);
                 }
                 else if (uri != null)
                 {
-                    gifFile = DecodeGifFile(uri);
+                    gifFile = await DecodeGifFileAsync(uri);
                 }
                 else
                 {
@@ -723,7 +729,7 @@ namespace WpfAnimatedGif
             {
                 throw new InvalidOperationException("Can't get a decoder from the source. AnimatedSource should be either a BitmapImage or a BitmapFrame.");
             }
-            return decoder;
+            return new Tuple<BitmapDecoder, GifFile>(decoder, gifFile);
         }
 
         private static bool CanReadNativeMetadata(BitmapDecoder decoder)
@@ -739,33 +745,37 @@ namespace WpfAnimatedGif
             }
         }
 
-        private static GifFile DecodeGifFile(Uri uri)
+        private static ConcurrentDictionary<Uri, Task<GifFile>> _imageCache = new ConcurrentDictionary<Uri, Task<GifFile>>();
+        private static async Task<GifFile> DecodeGifFileAsync(Uri uri)
         {
-            Stream stream = null;
-            if (uri.Scheme == PackUriHelper.UriSchemePack)
+            return await _imageCache.GetOrAdd(uri, async (path) =>
             {
-                StreamResourceInfo sri;
-                if (uri.Authority == "siteoforigin:,,,")
-                    sri = Application.GetRemoteStream(uri);
-                else
-                    sri = Application.GetResourceStream(uri);
-
-                if (sri != null)
-                    stream = sri.Stream;
-            }
-            else
-            {
-                WebClient wc = new WebClient();
-                stream = wc.OpenRead(uri);
-            }
-            if (stream != null)
-            {
-                using (stream)
+                Stream stream = null;
+                if (uri.Scheme == PackUriHelper.UriSchemePack)
                 {
-                    return GifFile.ReadGifFile(stream, true);
+                    StreamResourceInfo sri;
+                    if (uri.Authority == "siteoforigin:,,,")
+                        sri = Application.GetRemoteStream(uri);
+                    else
+                        sri = Application.GetResourceStream(uri);
+
+                    if (sri != null)
+                        stream = sri.Stream;
                 }
-            }
-            return null;
+                else
+                {
+                    WebClient wc = new WebClient();
+                    stream = await wc.OpenReadTaskAsync(path);
+                }
+                if (stream != null)
+                {
+                    using (stream)
+                    {
+                        return await GifFile.ReadGifFileAsync(stream, true);
+                    }
+                }
+                return null;
+            });
         }
 
         private static bool IsFullFrame(FrameMetadata metadata, Int32Size fullSize)

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -25,19 +26,19 @@ namespace WpfAnimatedGif.Decoding
             get { return GifBlockKind.Control; }
         }
 
-        internal static GifGraphicControlExtension ReadGraphicsControl(Stream stream)
+        internal static async Task<GifGraphicControlExtension> ReadGraphicsControlAsync(Stream stream)
         {
             var ext = new GifGraphicControlExtension();
-            ext.Read(stream);
+            await ext.ReadAsync(stream);
             return ext;
         }
 
-        private void Read(Stream stream)
+        private async Task ReadAsync(Stream stream)
         {
             // Note: at this point, the label (0xF9) has already been read
 
             byte[] bytes = new byte[6];
-            stream.ReadAll(bytes, 0, bytes.Length);
+            await stream.ReadAsync(bytes, 0, bytes.Length);
             BlockSize = bytes[0]; // should always be 4
             if (BlockSize != 4)
                 throw GifHelpers.InvalidBlockSizeException("Graphic Control Extension", 4, BlockSize);

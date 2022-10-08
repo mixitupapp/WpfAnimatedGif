@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -7,7 +8,7 @@ namespace WpfAnimatedGif.Decoding
     {
         internal const int ExtensionIntroducer = 0x21;
 
-        internal static GifExtension ReadExtension(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
+        internal static async Task<GifExtension> ReadExtensionAsync(Stream stream, IEnumerable<GifExtension> controlExtensions, bool metadataOnly)
         {
             // Note: at this point, the Extension Introducer (0x21) has already been read
 
@@ -17,13 +18,13 @@ namespace WpfAnimatedGif.Decoding
             switch (label)
             {
                 case GifGraphicControlExtension.ExtensionLabel:
-                    return GifGraphicControlExtension.ReadGraphicsControl(stream);
+                    return await GifGraphicControlExtension.ReadGraphicsControlAsync(stream);
                 case GifCommentExtension.ExtensionLabel:
-                    return GifCommentExtension.ReadComment(stream);
+                    return await GifCommentExtension.ReadCommentAsync(stream);
                 case GifPlainTextExtension.ExtensionLabel:
-                    return GifPlainTextExtension.ReadPlainText(stream, controlExtensions, metadataOnly);
+                    return await GifPlainTextExtension.ReadPlainTextAsync(stream, controlExtensions, metadataOnly);
                 case GifApplicationExtension.ExtensionLabel:
-                    return GifApplicationExtension.ReadApplication(stream);
+                    return await GifApplicationExtension.ReadApplicationAsync(stream);
                 default:
                     throw GifHelpers.UnknownExtensionTypeException(label);
             }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace WpfAnimatedGif.Decoding
 {
@@ -16,22 +17,22 @@ namespace WpfAnimatedGif.Decoding
         {
         }
 
-        internal static GifFile ReadGifFile(Stream stream, bool metadataOnly)
+        internal static async Task<GifFile> ReadGifFileAsync(Stream stream, bool metadataOnly)
         {
             var file = new GifFile();
-            file.Read(stream, metadataOnly);
+            await file.ReadAsync(stream, metadataOnly);
             return file;
         }
 
-        private void Read(Stream stream, bool metadataOnly)
+        private async Task ReadAsync(Stream stream, bool metadataOnly)
         {
-            Header = GifHeader.ReadHeader(stream);
+            Header = await GifHeader.ReadHeaderAsync(stream);
 
             if (Header.LogicalScreenDescriptor.HasGlobalColorTable)
             {
-                GlobalColorTable = GifHelpers.ReadColorTable(stream, Header.LogicalScreenDescriptor.GlobalColorTableSize);
+                GlobalColorTable = await GifHelpers.ReadColorTableAsync(stream, Header.LogicalScreenDescriptor.GlobalColorTableSize);
             }
-            ReadFrames(stream, metadataOnly);
+            await ReadFramesAsync(stream, metadataOnly);
 
             var netscapeExtension =
                             Extensions
@@ -44,14 +45,14 @@ namespace WpfAnimatedGif.Decoding
                 RepeatCount = 1;
         }
 
-        private void ReadFrames(Stream stream, bool metadataOnly)
+        private async Task ReadFramesAsync(Stream stream, bool metadataOnly)
         {
             List<GifFrame> frames = new List<GifFrame>();
             List<GifExtension> controlExtensions = new List<GifExtension>();
             List<GifExtension> specialExtensions = new List<GifExtension>();
             while (true)
             {
-                var block = GifBlock.ReadBlock(stream, controlExtensions, metadataOnly);
+                var block = await GifBlock.ReadBlockAsync(stream, controlExtensions, metadataOnly);
 
                 if (block.Kind == GifBlockKind.GraphicRendering)
                     controlExtensions = new List<GifExtension>();
